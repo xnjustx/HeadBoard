@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="fr" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Headboard — Console d'administration</title>
+
+  <!-- Tailwind CSS (Play CDN) — utilitaires de mise en page -->
+  <script>
+    tailwind = {
+      config: {
+        theme: {
+          extend: {
+            colors: {
+              base: '#0c0d10',
+              surface: '#1f2024',
+              edge: '#2a2b30',
+            },
+          },
+        },
+      },
+    };
+  </script>
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Styles personnalisés -->
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body class="text-zinc-100 antialiased">
+
+  <!-- ================================================================== -->
+  <!--  Layout racine : sidebar + zone principale                          -->
+  <!-- ================================================================== -->
+  <div class="flex h-screen overflow-hidden">
+
+    <!-- ============================ SIDEBAR ============================ -->
+    <aside id="sidebar" class="hidden md:flex flex-col w-[260px] shrink-0 bg-[#191a1f] shadow-[4px_0_24px_-12px_rgba(0,0,0,0.6)]">
+      <!-- Logo -->
+      <div class="flex items-center gap-3 px-5 h-16">
+        <div class="w-9 h-9 rounded-lg grid place-items-center"
+             style="background: linear-gradient(135deg, #4d7cfe, #3a68f0);">
+          <i data-lucide="network" class="w-5 h-5 text-white"></i>
+        </div>
+        <div class="leading-tight">
+          <div class="font-semibold text-[15px]">Headboard</div>
+          <div class="text-[11px] text-zinc-500">Console d'administration</div>
+        </div>
+      </div>
+
+      <!-- Navigation -->
+      <nav class="flex-1 overflow-y-auto p-3 space-y-1">
+        <button class="nav-item" data-view="overview">
+          <i data-lucide="layout-dashboard"></i> Vue d'ensemble
+        </button>
+        <button class="nav-item" data-view="nodes">
+          <i data-lucide="server"></i> Nœuds <span class="nav-badge" id="nav-count-nodes">0</span>
+        </button>
+        <button class="nav-item" data-view="users">
+          <i data-lucide="users"></i> Utilisateurs <span class="nav-badge" id="nav-count-users">0</span>
+        </button>
+        <button class="nav-item" data-view="preauthkeys">
+          <i data-lucide="key-round"></i> Clés Pre-Auth <span class="nav-badge" id="nav-count-keys">0</span>
+        </button>
+        <button class="nav-item" data-view="routes">
+          <i data-lucide="route"></i> Routes &amp; Exit Nodes
+        </button>
+        <button class="nav-item" data-view="apikeys">
+          <i data-lucide="key"></i> Clés API
+        </button>
+        <div class="h-px bg-[#26272c] my-2"></div>
+        <button class="nav-item" data-view="acl">
+          <i data-lucide="shield-check"></i> Politique ACL
+        </button>
+      </nav>
+
+      <!-- Pied de sidebar -->
+      <div class="p-4 border-t border-[#26272c] text-[11px] text-zinc-600">
+        <div class="flex items-center gap-2 mb-1">
+          <span class="dot" id="sidebar-status-dot"></span>
+          <span id="sidebar-status-text" class="truncate">Non configuré</span>
+        </div>
+        <span class="mono truncate block" id="sidebar-server-url">—</span>
+      </div>
+    </aside>
+
+    <!-- ======================== ZONE PRINCIPALE ======================== -->
+    <div class="flex-1 flex flex-col min-w-0">
+
+      <!-- ============================ TOPBAR ============================ -->
+      <header class="flex items-center gap-3 h-16 px-4 md:px-6 bg-[#191a1f] shrink-0 shadow-[0_1px_0_rgba(255,255,255,0.04)]">
+        <!-- Bouton mobile (ouvre la sidebar) -->
+        <button id="btn-menu" class="btn btn-icon md:hidden" title="Menu">
+          <i data-lucide="menu"></i>
+        </button>
+
+        <h1 id="page-title" class="text-[16px] font-semibold truncate">Vue d'ensemble</h1>
+
+        <div class="ml-auto flex items-center gap-2">
+          <!-- Indicateur de connexion -->
+          <div id="status-pill" class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface text-[12px]">
+            <span class="dot" id="header-status-dot"></span>
+            <span id="header-status-text">Non configuré</span>
+          </div>
+
+          <!-- Rafraîchir -->
+          <button id="btn-refresh" class="btn btn-icon" title="Rafraîchir les données">
+            <i data-lucide="refresh-cw"></i>
+          </button>
+
+          <!-- Paramètres -->
+          <button id="btn-settings" class="btn btn-icon" title="Paramètres">
+            <i data-lucide="settings"></i>
+          </button>
+        </div>
+      </header>
+
+      <!-- ============================ CONTENU ============================ -->
+      <main class="flex-1 overflow-y-auto p-4 md:p-6" id="main-content">
+
+        <!-- ============ VUE : VUE D'ENSEMBLE ============ -->
+        <section id="view-overview" class="view">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6" id="overview-stats"></div>
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div class="card card-pad">
+              <h3 class="section-title">Santé du serveur</h3>
+              <div id="overview-health" class="mt-3"></div>
+            </div>
+            <div class="card card-pad">
+              <h3 class="section-title">Répartition par utilisateur</h3>
+              <div id="overview-users" class="mt-3"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ VUE : NŒUDS ============ -->
+        <section id="view-nodes" class="view hidden">
+          <div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
+            <div>
+              <h2 class="section-title">Nœuds (Machines)</h2>
+              <p class="section-sub">Toutes les machines enregistrées sur ce serveur Headscale.</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <input id="nodes-filter" class="input" style="width: 220px;" placeholder="Filtrer…" />
+              <button id="btn-node-register" class="btn btn-primary">
+                <i data-lucide="plus"></i> Enregistrer
+              </button>
+              <button id="btn-backfill" class="btn" title="Rebackfiller les IPs des nœuds">
+                <i data-lucide="network"></i> Backfill IPs
+              </button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="table-wrap">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th class="th-sortable" data-node-sort="name">Nœud</th>
+                    <th class="th-sortable" data-node-sort="user">Utilisateur</th>
+                    <th class="th-sortable" data-node-sort="ip">Adresses IP</th>
+                    <th class="th-sortable" data-node-sort="status">Statut</th>
+                    <th class="th-sortable" data-node-sort="lastSeen">Dernière vue</th>
+                    <th>Tags</th><th class="text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="nodes-table-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ VUE : UTILISATEURS ============ -->
+        <section id="view-users" class="view hidden">
+          <div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
+            <div>
+              <h2 class="section-title">Utilisateurs</h2>
+              <p class="section-sub">Comptes utilisateurs et leurs nœuds associés.</p>
+            </div>
+            <button id="btn-user-create" class="btn btn-primary">
+              <i data-lucide="plus"></i> Nouvel utilisateur
+            </button>
+          </div>
+          <div class="card">
+            <div class="table-wrap">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Utilisateur</th><th>Email</th><th>Provider</th><th>Créé le</th>
+                    <th>Nœuds</th><th class="text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="users-table-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ VUE : CLÉS PRE-AUTH ============ -->
+        <section id="view-preauthkeys" class="view hidden">
+          <div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
+            <div>
+              <h2 class="section-title">Clés de Pré-Authentification</h2>
+              <p class="section-sub">Clés utilisées pour enregistrer de nouvelles machines.</p>
+            </div>
+            <button id="btn-preauth-create" class="btn btn-primary">
+              <i data-lucide="plus"></i> Générer une clé
+            </button>
+          </div>
+          <div class="card">
+            <div class="table-wrap">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Clé</th><th>Utilisateur</th><th>Réutilisable</th><th>Éphémère</th>
+                    <th>Utilisée</th><th>Expiration</th><th>Tags</th><th class="text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="preauth-table-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ VUE : ROUTES & EXIT NODES ============ -->
+        <section id="view-routes" class="view hidden">
+          <div class="mb-4">
+            <h2 class="section-title">Routes &amp; Exit Nodes</h2>
+            <p class="section-sub">Approuvez ou révoquez les routes de sous-réseau et nœuds de sortie annoncés par les machines.</p>
+          </div>
+          <div id="routes-container" class="grid grid-cols-1 lg:grid-cols-2 gap-4"></div>
+        </section>
+
+        <!-- ============ VUE : CLÉS API ============ -->
+        <section id="view-apikeys" class="view hidden">
+          <div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
+            <div>
+              <h2 class="section-title">Clés API</h2>
+              <p class="section-sub">Gérez les clés d'accès à l'API Headscale.</p>
+            </div>
+            <button id="btn-apikey-create" class="btn btn-primary">
+              <i data-lucide="plus"></i> Créer une clé
+            </button>
+          </div>
+          <div class="card">
+            <div class="table-wrap">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Préfixe</th><th>Expiration</th><th>Créée le</th><th>Dernière vue</th>
+                    <th class="text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="apikeys-table-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ VUE : POLITIQUE ACL ============ -->
+        <section id="view-acl" class="view hidden">
+          <div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
+            <div>
+              <h2 class="section-title">Politique ACL</h2>
+              <p class="section-sub">Construisez visuellement ou éditez le JSON de la politique réseau.</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button id="btn-acl-load" class="btn"><i data-lucide="download"></i> Charger</button>
+              <button id="btn-acl-check" class="btn"><i data-lucide="check-circle-2"></i> Vérifier</button>
+              <button id="btn-acl-save" class="btn btn-primary"><i data-lucide="save"></i> Sauvegarder</button>
+            </div>
+          </div>
+
+          <!-- Onglets : Visuel / JSON -->
+          <div class="mb-4">
+            <div class="tabs">
+              <button class="tab active" data-acl-tab="visual">Constructeur visuel</button>
+              <button class="tab" data-acl-tab="json">Code JSON</button>
+            </div>
+          </div>
+
+          <!-- Onglet visuel -->
+          <div id="acl-panel-visual">
+            <!-- Sources / groupes / tags disponibles -->
+            <div class="card card-pad mb-4">
+              <h4 class="text-[13px] font-semibold mb-3 text-zinc-400">Règles d'accès</h4>
+              <div id="acl-rules-list" class="space-y-3"></div>
+              <button id="btn-acl-add-rule" class="btn mt-3">
+                <i data-lucide="plus"></i> Ajouter une règle
+              </button>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <!-- Groupes -->
+              <div class="card card-pad">
+                <h4 class="text-[13px] font-semibold mb-3 text-zinc-400">Groupes</h4>
+                <div id="acl-groups-list" class="space-y-2"></div>
+                <button id="btn-acl-add-group" class="btn btn-sm mt-3">
+                  <i data-lucide="plus"></i> Groupe
+                </button>
+              </div>
+              <!-- Hôtes -->
+              <div class="card card-pad">
+                <h4 class="text-[13px] font-semibold mb-3 text-zinc-400">Hôtes</h4>
+                <div id="acl-hosts-list" class="space-y-2"></div>
+                <button id="btn-acl-add-host" class="btn btn-sm mt-3">
+                  <i data-lucide="plus"></i> Hôte
+                </button>
+              </div>
+              <!-- Tag owners -->
+              <div class="card card-pad">
+                <h4 class="text-[13px] font-semibold mb-3 text-zinc-400">Propriétaires de tags (tagOwners)</h4>
+                <div id="acl-tagowners-list" class="space-y-2"></div>
+                <button id="btn-acl-add-tagowner" class="btn btn-sm mt-3">
+                  <i data-lucide="plus"></i> Tag
+                </button>
+              </div>
+              <!-- Auto-approvers -->
+              <div class="card card-pad">
+                <h4 class="text-[13px] font-semibold mb-3 text-zinc-400">Approbation auto (autoApprovers)</h4>
+                <div id="acl-autoapprovers-list" class="space-y-2 text-sm"></div>
+              </div>
+            </div>
+
+            <!-- Sections non prises en charge -->
+            <div class="card card-pad mt-4">
+              <h4 class="text-[13px] font-semibold mb-1 text-zinc-400">Non pris en charge (JSON brut)</h4>
+              <p class="text-[12px] text-zinc-500 mb-3">Sections non gérées par le constructeur (nodeAttrs, ssh, derpMap, …). Éditez-les directement en JSON : elles sont conservées telles quelles dans la politique finale.</p>
+              <div id="acl-extras-list" class="space-y-4"></div>
+              <button id="btn-acl-add-extra" class="btn btn-sm mt-3"><i data-lucide="plus"></i> Ajouter une section</button>
+            </div>
+          </div>
+
+          <!-- Onglet JSON -->
+          <div id="acl-panel-json" class="hidden">
+            <textarea id="acl-json-editor" class="code-editor" spellcheck="false" placeholder="{&#10;  &quot;acls&quot;: [...]&#10;}"></textarea>
+            <div class="flex items-center gap-2 mt-3">
+              <button id="btn-acl-format" class="btn btn-sm"><i data-lucide="braces"></i> Formater</button>
+              <span class="text-dim text-[12px]">Dernière mise à jour : <span id="acl-updated-at">—</span></span>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <!-- ================================================================== -->
+  <!--  MODALES                                                            -->
+  <!-- ================================================================== -->
+
+  <!-- Modale : Paramètres -->
+  <div class="modal-overlay" id="modal-settings">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Paramètres de connexion</h3>
+        <button class="btn btn-icon" data-close="modal-settings"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body space-y-4">
+        <div>
+          <label class="field-label">URL du serveur Headscale</label>
+          <input id="cfg-baseurl" class="input mono" placeholder="https://headscale.mon-domaine.fr" />
+          <div class="field-hint">Exemple : https://headscale.example.com — sans /api/v1.</div>
+        </div>
+        <div>
+          <label class="field-label">Clé API (Bearer Token)</label>
+          <input id="cfg-apikey" class="input mono" type="password" placeholder="hs_xxxxxxxxxxxx" autocomplete="off" />
+          <div class="field-hint">Créée depuis votre serveur via <span class="mono">headscale apikeys create</span>.</div>
+        </div>
+        <div class="border-t border-edge pt-3">
+          <label class="flex items-center justify-between cursor-pointer">
+            <span class="text-[13px] font-medium">Utiliser un proxy CORS</span>
+            <label class="toggle"><input type="checkbox" id="cfg-proxy-enabled" /><span class="track"></span></label>
+          </label>
+          <div class="mt-3">
+            <label class="field-label">URL du proxy CORS</label>
+            <input id="cfg-proxyurl" class="input mono" placeholder="https://corsproxy.io/?" />
+            <div class="field-hint">Le préfixe est concaténé à l'URL encodée. Ex : corsproxy.io, allorigins.win/raw.</div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" data-close="modal-settings">Annuler</button>
+        <button id="btn-test-connection" class="btn"><i data-lucide="plug-zap"></i> Tester</button>
+        <button id="btn-save-settings" class="btn btn-primary"><i data-lucide="save"></i> Enregistrer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modale : Créer un utilisateur -->
+  <div class="modal-overlay" id="modal-user">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Nouvel utilisateur</h3>
+        <button class="btn btn-icon" data-close="modal-user"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body space-y-4">
+        <div>
+          <label class="field-label">Nom d'utilisateur *</label>
+          <input id="user-name" class="input" placeholder="alice" />
+        </div>
+        <div>
+          <label class="field-label">Nom d'affichage</label>
+          <input id="user-displayname" class="input" placeholder="Alice Martin" />
+        </div>
+        <div>
+          <label class="field-label">Email</label>
+          <input id="user-email" class="input" type="email" placeholder="alice@example.com" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" data-close="modal-user">Annuler</button>
+        <button id="btn-user-submit" class="btn btn-primary">Créer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modale : Créer une clé Pre-Auth -->
+  <div class="modal-overlay" id="modal-preauth">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Générer une clé Pre-Auth</h3>
+        <button class="btn btn-icon" data-close="modal-preauth"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body space-y-4">
+        <div>
+          <label class="field-label">Utilisateur *</label>
+          <select id="preauth-user" class="select"></select>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="field-label">Expiration</label>
+            <input id="preauth-expiration" class="input" type="datetime-local" />
+          </div>
+          <div>
+            <label class="field-label">Tags ACL (séparés par virgule)</label>
+            <input id="preauth-tags" class="input" placeholder="tag:server, tag:web" />
+          </div>
+        </div>
+        <div class="flex items-center gap-6">
+          <label class="flex items-center gap-2 cursor-pointer text-[13px]">
+            <label class="toggle"><input type="checkbox" id="preauth-reusable" checked /><span class="track"></span></label>
+            Réutilisable
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer text-[13px]">
+            <label class="toggle"><input type="checkbox" id="preauth-ephemeral" /><span class="track"></span></label>
+            Éphémère
+          </label>
+        </div>
+        <div id="preauth-result" class="hidden">
+          <label class="field-label">Clé générée (copiez-la maintenant)</label>
+          <div class="flex items-center gap-2">
+            <input id="preauth-result-key" class="input mono" readonly />
+            <button id="btn-copy-key" class="btn btn-icon" title="Copier"><i data-lucide="copy"></i></button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" data-close="modal-preauth">Fermer</button>
+        <button id="btn-preauth-submit" class="btn btn-primary">Générer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modale : Créer une clé API -->
+  <div class="modal-overlay" id="modal-apikey">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Créer une clé API</h3>
+        <button class="btn btn-icon" data-close="modal-apikey"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body space-y-4">
+        <div>
+          <label class="field-label">Expiration</label>
+          <input id="apikey-expiration" class="input" type="datetime-local" />
+          <div class="field-hint">Laissez vide pour une clé sans expiration.</div>
+        </div>
+        <div id="apikey-result" class="hidden">
+          <label class="field-label">Clé générée (copiez-la maintenant)</label>
+          <div class="flex items-center gap-2">
+            <input id="apikey-result-key" class="input mono" readonly />
+            <button id="btn-copy-apikey" class="btn btn-icon" title="Copier"><i data-lucide="copy"></i></button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" data-close="modal-apikey">Fermer</button>
+        <button id="btn-apikey-submit" class="btn btn-primary">Créer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modale : Éditeur de règle ACL -->
+  <div class="modal-overlay" id="modal-acl-rule">
+    <div class="modal" style="max-width: 640px;">
+      <div class="modal-header">
+        <h3 id="acl-rule-title">Ajouter une règle</h3>
+        <button class="btn btn-icon" data-close="modal-acl-rule"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body space-y-4">
+        <div>
+          <label class="field-label">Action</label>
+          <select id="acl-rule-action" class="select">
+            <option value="accept">accept — autoriser</option>
+            <option value="drop">drop — refuser</option>
+          </select>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="field-label">Sources (src)</label>
+            <div id="acl-rule-src" class="space-y-2 border border-edge rounded-lg p-3 min-h-[80px]"></div>
+            <div class="flex items-center gap-2 mt-2">
+              <select id="acl-rule-src-add" class="select"></select>
+              <button id="btn-acl-src-add" class="btn btn-sm">+</button>
+            </div>
+          </div>
+          <div>
+            <label class="field-label">Destinations (dst)</label>
+            <div id="acl-rule-dst" class="space-y-2 border border-edge rounded-lg p-3 min-h-[80px]"></div>
+            <div class="flex items-center gap-2 mt-2">
+              <select id="acl-rule-dst-add" class="select"></select>
+              <button id="btn-acl-dst-add" class="btn btn-sm">+</button>
+            </div>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="field-label">Ports sources (optionnel)</label>
+            <input id="acl-rule-src-ports" class="input mono" placeholder="*, 80,443 ou tcp:80,443" />
+          </div>
+          <div>
+            <label class="field-label">Ports destinations (optionnel)</label>
+            <input id="acl-rule-dst-ports" class="input mono" placeholder="80,443" />
+          </div>
+        </div>
+        <div class="field-hint">Les ports sont ajoutés en suffixe <span class="mono">:port</span> à chaque cible, au format Tailscale/Headscale.</div>
+        <div>
+          <label class="field-label">Commentaire (optionnel)</label>
+          <textarea id="acl-rule-comment" class="textarea" style="min-height:60px" placeholder="// Autiser les connexions exit-nodes"></textarea>
+          <div class="field-hint">Sera émis en <span class="mono">// …</span> au-dessus de la règle dans le JSON.</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" data-close="modal-acl-rule">Annuler</button>
+        <button id="btn-acl-rule-submit" class="btn btn-primary">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modale : Enregistrer un nœud manuellement -->
+  <div class="modal-overlay" id="modal-node-register">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Enregistrer un nœud manuellement</h3>
+        <button class="btn btn-icon" data-close="modal-node-register"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body space-y-4">
+        <div>
+          <label class="field-label">Utilisateur *</label>
+          <select id="node-register-user" class="select"></select>
+        </div>
+        <div>
+          <label class="field-label">Clé de la machine (Node Key)</label>
+          <input id="node-register-key" class="input mono" placeholder="nodekey:xxxxxxxx…" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" data-close="modal-node-register">Annuler</button>
+        <button id="btn-node-register-submit" class="btn btn-primary">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modale : Confirmation générique -->
+  <div class="modal-overlay" id="modal-confirm">
+    <div class="modal" style="max-width: 440px;">
+      <div class="modal-header">
+        <h3 id="confirm-title">Confirmer</h3>
+        <button class="btn btn-icon" data-close="modal-confirm"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body">
+        <p id="confirm-message" class="text-muted"></p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" data-close="modal-confirm">Annuler</button>
+        <button id="btn-confirm-ok" class="btn btn-danger">Confirmer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modale : Saisie générique (prompt) -->
+  <div class="modal-overlay" id="modal-prompt">
+    <div class="modal" style="max-width: 440px;">
+      <div class="modal-header">
+        <h3 id="prompt-title">Saisir</h3>
+        <button class="btn btn-icon" data-close="modal-prompt"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body">
+        <label class="field-label" id="prompt-label">Valeur</label>
+        <input id="prompt-input" class="input" />
+        <div class="field-hint" id="prompt-hint"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" data-close="modal-prompt">Annuler</button>
+        <button id="btn-prompt-ok" class="btn btn-primary">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modale : Édition d'une entité ACL (groupe / hôte / tag / auto-approver) -->
+  <div class="modal-overlay" id="modal-acl-entity">
+    <div class="modal" style="max-width: 440px;">
+      <div class="modal-header">
+        <h3 id="acl-entity-title">Modifier</h3>
+        <button class="btn btn-icon" data-close="modal-acl-entity"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body space-y-3" id="acl-entity-fields"></div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" data-close="modal-acl-entity">Annuler</button>
+        <button id="btn-acl-entity-submit" class="btn btn-primary">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Conteneur des notifications -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- Point d'entrée applicatif (modules ES6) -->
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
