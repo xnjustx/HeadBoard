@@ -113,8 +113,9 @@ git clone https://github.com/xnjustx/headboard.git src
 On first launch, click the **Settings** icon (top right) and fill in :
 
 - **Headscale server URL** — e.g. `https://headscale.example.com` (without `/api/v1`).
-- **API key (Bearer Token)** — created server-side with :
 
+- **API key (Bearer Token)** — created server-side with :
+  
   ```bash
   headscale apikeys create
   ```
@@ -127,10 +128,18 @@ The configuration is stored in the browser's `localStorage`.
 
 ## ⚙️ Prerequisites
 
-| Method | Dependency |
-|---|---|
-| Static | Python 3, Node.js, or any HTTP server |
+| Method | Dependency                                           |
+| ------ | ---------------------------------------------------- |
+| Static | Python 3, Node.js, or any HTTP server                |
 | Docker | Docker Engine + Docker Compose v2 (`docker compose`) |
+
+---
+
+## 📷 Screen shots
+
+![Aperçu de l'application](./screenshots/screenshot-2.png)
+
+![Aperçu de l'application](./screenshots/screenshot-1.png)![Aperçu de l'application](./screenshots/screenshot-8.png)![Aperçu de l'application](./screenshots/screenshot-12.png)![Aperçu de l'application](./screenshots/screenshot-3.png)
 
 ---
 
